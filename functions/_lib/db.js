@@ -93,23 +93,47 @@ export async function getDb(env) {
   }
   if (!ready) {
     await env.DB.batch(SCHEMA.map((sql) => env.DB.prepare(sql)));
-    const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM classes').first();
-    if (n === 0) {
-      const insert = env.DB.prepare(
-        `INSERT INTO classes (name_en, name_ar, coach, weekday, start_time, duration_min, capacity, ladies_only)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      );
-      const rows = [];
-      for (const [en, ar, coach, days, time, dur, cap, ladies] of STARTER_CLASSES) {
-        for (const day of days) rows.push(insert.bind(en, ar, coach, day, time, dur, cap, ladies));
+    // Several copies of the site can start at the same moment. Only the one that
+    // writes this flag first may add the starter timetable, so it's added once.
+    if (await claimOnce(env.DB, 'starter_timetable')) {
+      const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM classes').first();
+      if (n === 0) {
+        const insert = env.DB.prepare(
+          `INSERT INTO classes (name_en, name_ar, coach, weekday, start_time, duration_min, capacity, ladies_only)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        );
+        const rows = [];
+        for (const [en, ar, coach, days, time, dur, cap, ladies] of STARTER_CLASSES) {
+          for (const day of days) rows.push(insert.bind(en, ar, coach, day, time, dur, cap, ladies));
+        }
+        await env.DB.batch(rows);
       }
-      await env.DB.batch(rows);
+    }
+    // One-time repair (18 Oct 2026): the first launch added the starter timetable twice.
+    // Keeps the oldest copy of each class and moves bookings onto it.
+    if (await claimOnce(env.DB, 'fix_duplicate_classes')) {
+      const keep = `(SELECT MIN(k.id) FROM classes c JOIN classes k
+        ON k.name_en = c.name_en AND k.weekday = c.weekday AND k.start_time = c.start_time WHERE c.id = %s.class_id)`;
+      const dupes = 'SELECT id FROM classes WHERE id NOT IN (SELECT MIN(id) FROM classes GROUP BY name_en, weekday, start_time)';
+      await env.DB.batch([
+        env.DB.prepare(`UPDATE OR IGNORE bookings SET class_id = ${keep.replace('%s', 'bookings')}`),
+        env.DB.prepare(`UPDATE OR IGNORE cancelled_sessions SET class_id = ${keep.replace('%s', 'cancelled_sessions')}`),
+        env.DB.prepare(`DELETE FROM bookings WHERE class_id IN (${dupes})`),
+        env.DB.prepare(`DELETE FROM cancelled_sessions WHERE class_id IN (${dupes})`),
+        env.DB.prepare(`DELETE FROM classes WHERE id IN (${dupes})`),
+      ]);
     }
     const seed = env.DB.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
     await env.DB.batch(Object.entries(DEFAULT_SETTINGS).map(([k, v]) => seed.bind(k, v)));
     ready = true;
   }
   return env.DB;
+}
+
+// True for exactly one caller, ever: the first to write this key.
+async function claimOnce(db, key) {
+  const { meta } = await db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, datetime('now'))").bind(`done:${key}`).run();
+  return meta.changes === 1;
 }
 
 export async function getSettings(db) {
