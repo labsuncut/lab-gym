@@ -1,0 +1,16 @@
+{
+  "_note": "Demo gym for the trial. Every fact here is made up and must be replaced before reusing the site for a real client.",
+  "name": "Ironvale Athletic Club",
+  "tagline": "Train hard. Belong here.",
+  "category": "ExerciseGym",
+  "phone": "06 000 0000 (placeholder)",
+  "email": "",
+  "address": { "street": "Abdali Boulevard", "city": "Amman", "region": "", "postal": "" },
+  "hours": [
+    { "days": "Saturday to Thursday", "open": "06:00", "close": "23:00" },
+    { "days": "Friday", "open": "14:00", "close": "22:00" }
+  ],
+  "colors": { "brand": "#0c0e11", "accent": "#c9f231" },
+  "links": { "google": "", "instagram": "", "facebook": "", "whatsapp": "" },
+  "domain": "gym.fellowflow.ai"
+}

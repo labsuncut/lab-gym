@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Staff | Ironvale</title>
+  <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/staff.css">
+</head>
+<body class="staff">
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="logo" href="../" aria-label="Back to the website">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#c9f231"/><path d="M9 8h4v16H9zM15 8h4l4 16h-4z" fill="#101300"/></svg>
+        <span class="logo-word">Ironvale staff</span>
+      </a>
+      <button class="btn btn-ghost btn-small" id="logout" type="button" hidden>Log out</button>
+    </div>
+  </header>
+
+  <main class="wrap staff-main">
+    <section id="login-view" hidden>
+      <form class="card form login" id="login-form">
+        <h1>Staff login</h1>
+        <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="btn" type="submit">Log in</button>
+        <p class="form-status err" id="login-error" role="alert"></p>
+      </form>
+    </section>
+
+    <section id="app-view" hidden>
+      <div class="tiles" id="tiles"></div>
+
+      <nav class="tabs" role="tablist" aria-label="Sections">
+        <button type="button" role="tab" data-tab="day" aria-selected="true">Classes</button>
+        <button type="button" role="tab" data-tab="leads">Trials and messages</button>
+        <button type="button" role="tab" data-tab="timetable">Timetable</button>
+        <button type="button" role="tab" data-tab="settings">Settings</button>
+      </nav>
+
+      <div class="panel" data-panel="day">
+        <div class="toolbar">
+          <button class="btn btn-ghost btn-small" type="button" id="day-prev" aria-label="Previous day">‹</button>
+          <input type="date" id="day-date">
+          <button class="btn btn-ghost btn-small" type="button" id="day-next" aria-label="Next day">›</button>
+          <button class="btn btn-ghost btn-small" type="button" id="day-today">Today</button>
+        </div>
+        <div id="day-list" class="stack"></div>
+      </div>
+
+      <div class="panel" data-panel="leads" hidden>
+        <h2 class="panel-title">Free trial requests</h2>
+        <div class="table-wrap"><table class="data" id="trials"></table></div>
+        <h2 class="panel-title">Messages</h2>
+        <div class="table-wrap"><table class="data" id="messages"></table></div>
+      </div>
+
+      <div class="panel" data-panel="timetable" hidden>
+        <p class="muted">The weekly timetable. Changes show on the website straight away. Hide a class instead of deleting it, so old bookings keep their history.</p>
+        <div class="table-wrap"><table class="data" id="classes"></table></div>
+        <h2 class="panel-title">Add a class</h2>
+        <form class="card form class-form" id="class-form"></form>
+      </div>
+
+      <div class="panel" data-panel="settings" hidden>
+        <form class="card form" id="settings-form">
+          <h2 class="panel-title">Notice bar</h2>
+          <p class="muted">A short message at the top of the website, e.g. "Closed Friday for Eid". Leave empty to hide it.</p>
+          <label>English<input name="notice_en" maxlength="160"></label>
+          <label>Arabic<input name="notice_ar" maxlength="160" dir="rtl"></label>
+          <label class="check"><input type="checkbox" name="booking_open"> Online booking is open</label>
+          <button class="btn" type="submit">Save</button>
+          <p class="form-status" role="status"></p>
+        </form>
+        <div class="card">
+          <h2 class="panel-title">Download your data</h2>
+          <p class="muted">CSV files open in Excel or Google Sheets.</p>
+          <div class="confirm-actions">
+            <a class="btn btn-ghost btn-small" href="/api/staff/export?type=bookings">Bookings</a>
+            <a class="btn btn-ghost btn-small" href="/api/staff/export?type=trials">Trial requests</a>
+            <a class="btn btn-ghost btn-small" href="/api/staff/export?type=messages">Messages</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script src="../assets/js/staff.js"></script>
+</body>
+</html>

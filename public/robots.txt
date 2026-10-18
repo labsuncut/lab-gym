@@ -1,0 +1,5 @@
+# Trial site: crawlers are kept out with a noindex tag on each page.
+User-agent: *
+Disallow: /staff/
+Disallow: /api/
+Sitemap: https://gym.fellowflow.ai/sitemap.xml
