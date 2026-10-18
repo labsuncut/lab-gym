@@ -32,15 +32,51 @@
 
     <section id="app-view" hidden>
       <div class="tiles" id="tiles"></div>
+      <p class="muted sources" id="sources"></p>
 
       <nav class="tabs" role="tablist" aria-label="Sections">
-        <button type="button" role="tab" data-tab="day" aria-selected="true">Classes</button>
+        <button type="button" role="tab" data-tab="crowd" aria-selected="true">Crowd</button>
+        <button type="button" role="tab" data-tab="day" aria-selected="false">Classes</button>
         <button type="button" role="tab" data-tab="leads">Trials and messages</button>
         <button type="button" role="tab" data-tab="timetable">Timetable</button>
         <button type="button" role="tab" data-tab="settings">Settings</button>
       </nav>
 
-      <div class="panel" data-panel="day">
+      <div class="panel" data-panel="crowd">
+        <p class="overdue" id="overdue" hidden></p>
+        <form class="card counter" id="count-form">
+          <span class="counter-label">People in the gym now</span>
+          <div class="counter-row">
+            <button type="button" class="step" data-step="-5" aria-label="Minus 5">−5</button>
+            <button type="button" class="step" data-step="-1" aria-label="Minus 1">−</button>
+            <input type="number" name="people" min="0" max="1000" inputmode="numeric" value="0" aria-label="People in the gym now">
+            <button type="button" class="step" data-step="1" aria-label="Plus 1">+</button>
+            <button type="button" class="step" data-step="5" aria-label="Plus 5">+5</button>
+          </div>
+          <button class="btn" type="submit">Save count</button>
+          <span class="muted" id="last-count"></span>
+        </form>
+        <div class="card chart-card">
+          <h2 class="panel-title">Today vs a usual <span id="chart-day"></span></h2>
+          <div class="legend"><span class="key key-today"></span>Today <span class="key key-usual"></span>Usual (last 4 weeks)</div>
+          <div class="chart" id="line-chart"></div>
+        </div>
+        <div class="card chart-card">
+          <h2 class="panel-title">Usual crowd by day and hour</h2>
+          <p class="muted">Average people counted at each hour over the last 4 weeks. Darker means busier.</p>
+          <div class="heat-wrap"><table class="heat" id="heatmap"></table></div>
+        </div>
+        <div class="card">
+          <h2 class="panel-title">Practice data (trial only)</h2>
+          <p class="muted">Fill the charts with 4 weeks of made-up counts to see how they look, then remove them before real counting starts.</p>
+          <div class="confirm-actions">
+            <button class="btn btn-ghost btn-small" type="button" id="sample-add">Add practice counts</button>
+            <button class="btn btn-ghost btn-small" type="button" id="sample-remove">Remove practice counts</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" data-panel="day" hidden>
         <div class="toolbar">
           <button class="btn btn-ghost btn-small" type="button" id="day-prev" aria-label="Previous day">‹</button>
           <input type="date" id="day-date">
@@ -51,7 +87,22 @@
       </div>
 
       <div class="panel" data-panel="leads" hidden>
-        <h2 class="panel-title">Free trial requests</h2>
+        <form class="card form lead-form" id="lead-form">
+          <h2 class="panel-title">Log a lead</h2>
+          <p class="muted">Someone asked on WhatsApp, called, or walked in? Add them here so every lead is in one list.</p>
+          <div class="lead-grid">
+            <label>Name<input name="name" required maxlength="80"></label>
+            <label>Phone<input name="phone" type="tel" required></label>
+            <label>Came from<select name="source">
+              <option value="whatsapp">WhatsApp</option><option value="phone">Phone call</option><option value="walk-in">Walk-in</option>
+              <option value="instagram">Instagram</option><option value="referral">Friend / member</option><option value="other">Other</option>
+            </select></label>
+            <label>Interested in<input name="goal" maxlength="60" placeholder="e.g. monthly, boxing"></label>
+            <label>Note<input name="note" maxlength="300"></label>
+          </div>
+          <button class="btn" type="submit">Add lead</button>
+        </form>
+        <h2 class="panel-title">Leads and free trial requests</h2>
         <div class="table-wrap"><table class="data" id="trials"></table></div>
         <h2 class="panel-title">Messages</h2>
         <div class="table-wrap"><table class="data" id="messages"></table></div>
@@ -81,6 +132,7 @@
             <a class="btn btn-ghost btn-small" href="/api/staff/export?type=bookings">Bookings</a>
             <a class="btn btn-ghost btn-small" href="/api/staff/export?type=trials">Trial requests</a>
             <a class="btn btn-ghost btn-small" href="/api/staff/export?type=messages">Messages</a>
+            <a class="btn btn-ghost btn-small" href="/api/staff/export?type=counts">Crowd counts</a>
           </div>
         </div>
       </div>

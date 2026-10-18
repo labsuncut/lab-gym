@@ -27,7 +27,9 @@ Public site (`public/index.html`):
 - Arabic switch (right-to-left), remembered per visitor
 
 Staff dashboard (`public/staff/`):
-- Today's numbers: bookings, check-ins, new trial requests, new messages
+- Crowd: staff count the people in the gym (± buttons, a reminder after 45 min), a "today vs a usual day" chart and a busy-hours heatmap from the last 4 weeks; the count shows live on the website ("17 in the gym now")
+- Today's numbers: people in the gym, bookings, check-ins, new leads, leads and joins this month, taps on WhatsApp and Call
+- Log a lead that came by WhatsApp, phone, walk-in or Instagram, so every lead is in one list with its source
 - Classes by day: who booked, mark Here or No-show, add walk-ins, cancel one class on one day
 - Trial requests and messages with status and notes (the follow-up pipeline)
 - Weekly timetable editor (add, edit, hide classes)
@@ -45,6 +47,8 @@ Protection built in: spam honeypot, rate limits per visitor (IP stored only as a
 | `POST /api/trial` | Free trial request |
 | `POST /api/contact` | Contact message |
 | `GET /api/info` | Notice bar text |
+| `GET /api/live` | Latest head count and the usual crowd now |
+| `POST /api/track` | Counts taps on Call, WhatsApp, Directions (no personal data) |
 | `/api/staff/*` | Dashboard routes; need the staff cookie |
 
 ## Editing

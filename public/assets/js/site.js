@@ -113,6 +113,44 @@
     api('/api/info').then((d) => { notice = d; renderNotice(); }).catch(() => {});
   }
 
+  // ---------- How busy is it (staff count people by hand in the dashboard) ----------
+  let live = null;
+  function renderLive() {
+    const hero = $('#live');
+    const visit = $('#live-visit');
+    if (!hero || !live) return;
+    const parts = [];
+    if (live.people != null) parts.push(t().liveNow(live.people));
+    else if (live.usual_now != null) parts.push(t().usualNow(Math.round(live.usual_now)));
+    if (parts.length && live.quiet_hour != null) parts.push(t().quietAt(live.quiet_hour));
+    const html = parts.join(' · ');
+    hero.innerHTML = html;
+    hero.hidden = !html;
+    if (visit) { visit.innerHTML = html; visit.hidden = !html; }
+  }
+  rerenders.push(renderLive);
+  async function loadLive() {
+    try { live = await api('/api/live'); renderLive(); } catch { /* badge stays hidden */ }
+  }
+  if ($('#live')) {
+    loadLive();
+    setInterval(() => { if (document.visibilityState === 'visible') loadLive(); }, 120_000);
+  }
+
+  // ---------- Count taps on Call, WhatsApp, Directions (no personal data) ----------
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href]');
+    if (!a) return;
+    const href = a.getAttribute('href');
+    const kind = href.startsWith('tel:') ? 'call'
+      : href.includes('wa.me') ? 'whatsapp'
+      : href.includes('google.com/maps') ? 'directions'
+      : href.includes('instagram.com') ? 'instagram' : null;
+    if (!kind) return;
+    const body = new Blob([JSON.stringify({ kind, page: location.pathname })], { type: 'application/json' });
+    try { navigator.sendBeacon('/api/track', body); } catch { /* never block the tap */ }
+  });
+
   // ---------- Timetable ----------
   const sessionsEl = $('#sessions');
   const tabsEl = $('#day-tabs');

@@ -107,6 +107,22 @@ export function ammanNow() {
   return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
 }
 
+// Amman weekday (0 = Sunday), hour and date for any moment.
+export function ammanParts(when) {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Amman', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short',
+    }).formatToParts(new Date(when)).map((x) => [x.type, x.value]),
+  );
+  return {
+    date: `${p.year}-${p.month}-${p.day}`,
+    weekday: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday),
+    hour: Number(p.hour),
+    minute: Number(p.minute),
+  };
+}
+
 export function addDays(isoDate, days) {
   const d = new Date(`${isoDate}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);

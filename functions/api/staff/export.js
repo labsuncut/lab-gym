@@ -5,7 +5,8 @@ import { getDb } from '../../_lib/db.js';
 const QUERIES = {
   bookings: `SELECT b.date, c.start_time, c.name_en AS class, c.coach, b.name, b.phone, b.status, b.created_at
              FROM bookings b JOIN classes c ON c.id = b.class_id ORDER BY b.date DESC, c.start_time`,
-  trials: 'SELECT created_at, name, phone, email, goal, preferred_day, status, note FROM trials ORDER BY id DESC',
+  trials: 'SELECT created_at, source, name, phone, email, goal, preferred_day, status, note FROM trials ORDER BY id DESC',
+  counts: 'SELECT at AS time_utc, people, sample FROM counts ORDER BY at DESC',
   messages: 'SELECT created_at, name, phone, email, topic, body, status FROM messages ORDER BY id DESC',
 };
 

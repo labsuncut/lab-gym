@@ -43,6 +43,7 @@ const SCHEMA = [
     preferred_day TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new','contacted','visited','joined','not_interested')),
     note TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT 'website',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
   `CREATE TABLE IF NOT EXISTS messages (
@@ -55,6 +56,19 @@ const SCHEMA = [
     status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new','replied','closed')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
+  `CREATE TABLE IF NOT EXISTS counts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    people INTEGER NOT NULL CHECK (people BETWEEN 0 AND 1000),
+    at TEXT NOT NULL,
+    sample INTEGER NOT NULL DEFAULT 0
+  )`,
+  `CREATE INDEX IF NOT EXISTS counts_by_time ON counts (at)`,
+  `CREATE TABLE IF NOT EXISTS clicks (
+    kind TEXT NOT NULL,
+    page TEXT NOT NULL DEFAULT '',
+    at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS clicks_by_time ON clicks (at)`,
   `CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -108,6 +122,11 @@ export async function getDb(env) {
         }
         await env.DB.batch(rows);
       }
+    }
+    // Databases made before 18 Oct 2026 evening have no "source" column on trials.
+    if (await claimOnce(env.DB, 'trials_source')) {
+      await env.DB.prepare(`ALTER TABLE trials ADD COLUMN source TEXT NOT NULL DEFAULT 'website'`).run()
+        .catch((err) => { if (!String(err.message).includes('duplicate column')) throw err; });
     }
     // One-time repair (18 Oct 2026): the first launch added the starter timetable twice.
     // Keeps the oldest copy of each class and moves bookings onto it.

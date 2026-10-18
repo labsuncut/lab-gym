@@ -70,19 +70,142 @@
 
   // ---------- Overview tiles ----------
   let today = null;
+  const ago = (iso) => {
+    const min = Math.round((Date.now() - Date.parse(iso)) / 60_000);
+    return min < 1 ? 'just now' : min < 60 ? `${min} min ago` : `${Math.floor(min / 60)} h ${min % 60} min ago`;
+  };
+  const SOURCE_NAMES = { website: 'Website', whatsapp: 'WhatsApp', phone: 'Phone', 'walk-in': 'Walk-in', instagram: 'Instagram', referral: 'Friend / member', other: 'Other' };
+
   async function loadTiles() {
-    const { today: d, counts: c } = await api('/api/staff/overview');
-    today = d;
+    const o = await api('/api/staff/overview');
+    const c = o.counts;
+    today = o.today;
+    const fresh = o.last_count && Date.now() - Date.parse(o.last_count.at) < 2 * 3_600_000;
     const tiles = [
+      [fresh ? o.last_count.people : '–', fresh ? `In the gym now (${ago(o.last_count.at)})` : 'In the gym now (no recent count)'],
       [c.today, 'Bookings today'],
-      [c.upcoming, 'Upcoming bookings'],
-      [c.lastWeek, 'Bookings, last 7 days'],
       [c.attended, 'Check-ins, last 7 days'],
-      [c.trialsNew, 'New trial requests', c.trialsNew > 0],
+      [c.trialsNew, 'New leads to call', c.trialsNew > 0],
       [c.messagesNew, 'New messages', c.messagesNew > 0],
+      [c.leadsMonth, 'Leads this month'],
+      [c.joinedMonth, 'Joined this month'],
+      [o.taps.whatsapp || 0, 'WhatsApp taps, 7 days'],
+      [o.taps.call || 0, 'Call taps, 7 days'],
     ];
     $('#tiles').innerHTML = tiles.map(([n, label, hot]) => `<div class="tile${hot ? ' hot' : ''}"><b>${n}</b><span>${label}</span></div>`).join('');
+    $('#sources').textContent = o.sources.length
+      ? `Leads this month by source: ${o.sources.map((r) => `${SOURCE_NAMES[r.source] || r.source} ${r.n}`).join(' · ')}`
+      : '';
   }
+
+  // ---------- Crowd: head count, today vs usual, busy hours ----------
+  const countForm = $('#count-form');
+  for (const b of $$('.step', countForm)) {
+    b.addEventListener('click', () => {
+      const v = Math.max(0, (Number(countForm.people.value) || 0) + Number(b.dataset.step));
+      countForm.people.value = v;
+    });
+  }
+  countForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    api('/api/staff/crowd', 'POST', { people: Number(countForm.people.value) })
+      .then(() => { toast('Count saved. The website shows it now.'); loadCrowd(); loadTiles(); }).catch(fail);
+  });
+  $('#sample-add').addEventListener('click', () => {
+    if (!confirm('Add 4 weeks of made-up counts? Only for practice.')) return;
+    api('/api/staff/crowd', 'POST', { sample: true }).then((r) => { toast(`Added ${r.added} practice counts`); loadCrowd(); }).catch(fail);
+  });
+  $('#sample-remove').addEventListener('click', () => {
+    api('/api/staff/crowd', 'DELETE').then(() => { toast('Practice counts removed'); loadCrowd(); loadTiles(); }).catch(fail);
+  });
+
+  const OPEN = { 5: [14, 22] }; // Friday 2 PM to 10 PM; every other day 6 AM to 11 PM
+  const hoursOf = (d) => OPEN[d] || [6, 23];
+  const ORDER = [6, 0, 1, 2, 3, 4, 5]; // the week starts on Saturday in Jordan
+
+  function lineChart(el, todayCounts, usualRow, now) {
+    const [open, close] = hoursOf(now.weekday);
+    const W = Math.max(320, Math.min(900, el.clientWidth || 720)); const H = W < 500 ? 220 : 260; const L = 34; const R = 12; const T = 12; const B = 28;
+    const x = (h) => L + ((h - open) / (close - open)) * (W - L - R);
+    const pts = todayCounts.map((p) => ({ h: p.hour + p.minute / 60, v: p.people }));
+    const usual = [];
+    for (let h = open; h < close; h++) if (usualRow[h] != null) usual.push({ h: h + 0.5, v: usualRow[h] });
+    const max = Math.max(10, ...pts.map((p) => p.v), ...usual.map((p) => p.v));
+    const top = Math.ceil(max / 10) * 10;
+    const y = (v) => T + (1 - v / top) * (H - T - B);
+    const path = (arr) => arr.map((p, i) => `${i ? 'L' : 'M'}${x(p.h).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
+    let grid = '';
+    for (let v = 0; v <= top; v += top / 4) grid += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+    let xs = '';
+    for (let h = open; h <= close; h += W < 500 ? 4 : 2) xs += `<text x="${x(h)}" y="${H - 8}" text-anchor="middle">${h}:00</text>`;
+    const nowX = now.hour >= open && now.hour < close ? x(now.hour + now.minute / 60) : null;
+    el.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="People in the gym today compared with a usual day">
+        <g class="grid axis">${grid}</g><g class="axis">${xs}</g>
+        ${nowX ? `<line x1="${nowX}" x2="${nowX}" y1="${T}" y2="${H - B}" stroke="#a6aeb7" stroke-width="1" stroke-dasharray="2 4"/>` : ''}
+        <path d="${path(usual)}" fill="none" stroke="#8b93a1" stroke-width="2" stroke-dasharray="6 5" stroke-linecap="round"/>
+        <path d="${path(pts)}" fill="none" stroke="#c9f231" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        ${pts.map((p) => `<circle cx="${x(p.h)}" cy="${y(p.v)}" r="4.5" fill="#c9f231" stroke="#14171c" stroke-width="2"/>`).join('')}
+        <line class="hover" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="#f3f5f6" stroke-width="1" visibility="hidden"/>
+        <rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent"/>
+      </svg>
+      <div class="tip" hidden></div>
+      ${pts.length ? '' : '<p class="muted">No counts yet today. Save the first one above.</p>'}`;
+    const svg = $('svg', el); const tip = $('.tip', el); const line = $('.hover', el);
+    svg.addEventListener('pointermove', (e) => {
+      const box = svg.getBoundingClientRect();
+      const sx = ((e.clientX - box.left) / box.width) * W;
+      const h = Math.min(close - 0.01, Math.max(open, open + ((sx - L) / (W - L - R)) * (close - open)));
+      const hour = Math.floor(h);
+      const mid = x(hour + 0.5);
+      const nearest = pts.filter((p) => Math.floor(p.h) === hour).pop();
+      line.setAttribute('x1', mid); line.setAttribute('x2', mid); line.setAttribute('visibility', 'visible');
+      tip.hidden = false;
+      tip.style.left = `${(mid / W) * 100}%`;
+      tip.style.top = `${(T / H) * 100}%`;
+      tip.textContent = `${hour}:00 · today ${nearest ? nearest.v : '–'} · usual ${usualRow[hour] ?? '–'}`;
+    });
+    svg.addEventListener('pointerleave', () => { tip.hidden = true; line.setAttribute('visibility', 'hidden'); });
+  }
+
+  function heatmap(table, usual) {
+    let max = 1;
+    usual.forEach((row) => row.forEach((v) => { if (v != null) max = Math.max(max, v); }));
+    let html = '<tr><th></th>';
+    for (let h = 6; h < 23; h++) html += `<th scope="col">${h}</th>`;
+    html += '</tr>';
+    for (const d of ORDER) {
+      const [open, close] = hoursOf(d);
+      html += `<tr><th scope="row">${DAYS[d].slice(0, 3)}</th>`;
+      for (let h = 6; h < 23; h++) {
+        const v = usual[d][h];
+        if (v == null || h < open || h >= close) { html += `<td class="none" title="${DAYS[d]} ${h}:00: no counts"></td>`; continue; }
+        const a = 0.15 + 0.85 * (v / max);
+        html += `<td style="background:rgba(201,242,49,${a.toFixed(2)})" title="${DAYS[d]} ${h}:00: usually ${Math.round(v)} people">${Math.round(v)}</td>`;
+      }
+      html += '</tr>';
+    }
+    table.innerHTML = html;
+  }
+
+  async function loadCrowd() {
+    const c = await api('/api/staff/crowd');
+    const last = c.last;
+    $('#last-count').textContent = last ? `Last count: ${last.people} people, ${ago(last.at)}` : 'No counts yet.';
+    if (last && document.activeElement !== countForm.people) countForm.people.value = last.people;
+    const [open, close] = hoursOf(c.now.weekday);
+    const isOpen = c.now.hour >= open && c.now.hour < close;
+    const late = !last || Date.now() - Date.parse(last.at) > 45 * 60_000;
+    $('#overdue').hidden = !(isOpen && late);
+    $('#overdue').textContent = last ? `Time to count: the last count was ${ago(last.at)}.` : 'Time to count: no count yet today.';
+    $('#chart-day').textContent = DAYS[c.now.weekday];
+    lineChart($('#line-chart'), c.today, c.usual[c.now.weekday], c.now);
+    heatmap($('#heatmap'), c.usual);
+    $('#sample-remove').disabled = !c.has_samples;
+  }
+  setInterval(() => {
+    if (!$('#app-view').hidden && document.visibilityState === 'visible') { loadTiles().catch(() => {}); if (!$('[data-panel=crowd]').hidden) loadCrowd().catch(() => {}); }
+  }, 60_000);
 
   // ---------- Classes on a day ----------
   const dateInput = $('#day-date');
@@ -160,11 +283,11 @@
   async function loadLeads() {
     const { trials, messages } = await api('/api/staff/leads');
     const tt = $('#trials');
-    tt.innerHTML = '<tr><th>When</th><th>Name</th><th>Phone</th><th>Email</th><th>Goal</th><th>Day</th><th>Status</th><th>Note</th></tr>'
-      + (trials.length ? '' : '<tr><td colspan="8" class="muted">No trial requests yet.</td></tr>');
+    tt.innerHTML = '<tr><th>When</th><th>From</th><th>Name</th><th>Phone</th><th>Email</th><th>Goal</th><th>Day</th><th>Status</th><th>Note</th></tr>'
+      + (trials.length ? '' : '<tr><td colspan="9" class="muted">No leads yet.</td></tr>');
     for (const r of trials) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td class="${r.status === 'new' ? 'new' : ''}">${when(r.created_at)}</td><td>${esc(r.name)}</td>
+      tr.innerHTML = `<td class="${r.status === 'new' ? 'new' : ''}">${when(r.created_at)}</td><td>${esc(SOURCE_NAMES[r.source] || r.source || 'Website')}</td><td>${esc(r.name)}</td>
         <td><a href="tel:${esc(r.phone)}">${esc(r.phone)}</a></td><td>${esc(r.email)}</td><td>${esc(r.goal)}</td><td>${esc(r.preferred_day)}</td>
         <td>${select(['new', 'contacted', 'visited', 'joined', 'not_interested'], r.status)}</td>
         <td><input value="${esc(r.note)}" maxlength="300" placeholder="Add a note"></td>`;
@@ -187,6 +310,13 @@
       mt.append(tr);
     }
   }
+
+  $('#lead-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = e.target;
+    api('/api/staff/leads', 'POST', { name: f.name.value, phone: f.phone.value, source: f.source.value, goal: f.goal.value, note: f.note.value })
+      .then(() => { toast('Lead added'); f.reset(); loadLeads(); loadTiles(); }).catch(fail);
+  });
 
   // ---------- Weekly timetable ----------
   const dayOptions = (v) => [6, 0, 1, 2, 3, 4, 5].map((d) => `<option value="${d}"${d === v ? ' selected' : ''}>${DAYS[d]}</option>`).join('');
@@ -259,7 +389,7 @@
     }).then(() => toast('Saved. The website shows it within a minute.')).catch(fail);
   });
 
-  const loaders = { day: loadDay, leads: loadLeads, timetable: loadClasses, settings: loadSettings };
+  const loaders = { crowd: loadCrowd, day: loadDay, leads: loadLeads, timetable: loadClasses, settings: loadSettings };
 
   async function refreshAll() {
     try {
